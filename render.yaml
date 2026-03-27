@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: esp01-clicker
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: API_KEY
+        sync: false
+      - key: MAX_EVENTS
+        value: 300
