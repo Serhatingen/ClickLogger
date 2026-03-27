@@ -7,9 +7,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.API_KEY || 'degistir-bunu';
-const MAX_EVENTS = Number(process.env.MAX_EVENTS || 300);
+const MAX_EVENTS = Math.max(1, Number(process.env.MAX_EVENTS || 300));
 
 const app = express();
 const server = http.createServer(app);
@@ -19,16 +19,34 @@ const io = new Server(server, {
   }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
 const state = {
   totalClicks: 0,
   devices: {},
   events: []
 };
+
+function getSortedDevices() {
+  return Object.values(state.devices).sort((a, b) => {
+    return (b.lastSeenAt || '').localeCompare(a.lastSeenAt || '');
+  });
+}
+
+function getPublicState() {
+  return {
+    totalClicks: state.totalClicks,
+    devices: getSortedDevices(),
+    events: state.events
+  };
+}
+
+function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 function makeEvent({ deviceId, ip, rssi, battery, sourceTs }) {
   const now = new Date();
@@ -46,12 +64,13 @@ function makeEvent({ deviceId, ip, rssi, battery, sourceTs }) {
     };
   }
 
-  state.devices[deviceId].clickCount += 1;
-  state.devices[deviceId].lastSeenAt = now.toISOString();
-  state.devices[deviceId].lastIp = ip || null;
-  state.devices[deviceId].lastRssi = typeof rssi === 'number' ? rssi : null;
-  state.devices[deviceId].lastBattery = battery ?? null;
-  state.devices[deviceId].lastDeviceTimestamp = sourceTs ?? null;
+  const device = state.devices[deviceId];
+  device.clickCount += 1;
+  device.lastSeenAt = now.toISOString();
+  device.lastIp = ip || null;
+  device.lastRssi = rssi;
+  device.lastBattery = battery;
+  device.lastDeviceTimestamp = sourceTs;
 
   const event = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -59,10 +78,10 @@ function makeEvent({ deviceId, ip, rssi, battery, sourceTs }) {
     deviceId,
     serverTimestamp: now.toISOString(),
     serverUnixMs: now.getTime(),
-    deviceTimestamp: sourceTs ?? null,
+    deviceTimestamp: sourceTs,
     ip: ip || null,
-    rssi: typeof rssi === 'number' ? rssi : null,
-    battery: battery ?? null
+    rssi,
+    battery
   };
 
   state.events.unshift(event);
@@ -72,6 +91,10 @@ function makeEvent({ deviceId, ip, rssi, battery, sourceTs }) {
 
   return event;
 }
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 app.get('/health', (req, res) => {
   res.json({
@@ -84,13 +107,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/state', (req, res) => {
-  res.json({
-    totalClicks: state.totalClicks,
-    devices: Object.values(state.devices).sort((a, b) => {
-      return (b.lastSeenAt || '').localeCompare(a.lastSeenAt || '');
-    }),
-    events: state.events
-  });
+  res.json(getPublicState());
 });
 
 app.post('/api/click', (req, res) => {
@@ -107,28 +124,21 @@ app.post('/api/click', (req, res) => {
 
   const event = makeEvent({
     deviceId,
-    ip: req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket.remoteAddress,
-    rssi: Number.isFinite(body.rssi) ? body.rssi : Number(body.rssi),
+    ip: req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket.remoteAddress || null,
+    rssi: toNumberOrNull(body.rssi),
     battery: body.battery ?? null,
     sourceTs: body.deviceTimestamp ?? body.millis ?? null
   });
 
+  const publicState = getPublicState();
   io.emit('click', event);
-  io.emit('state', {
-    totalClicks: state.totalClicks,
-    devices: Object.values(state.devices).sort((a, b) => (b.lastSeenAt || '').localeCompare(a.lastSeenAt || '')),
-    events: state.events
-  });
+  io.emit('state', publicState);
 
-  res.json({ ok: true, event });
+  return res.json({ ok: true, event });
 });
 
 io.on('connection', (socket) => {
-  socket.emit('state', {
-    totalClicks: state.totalClicks,
-    devices: Object.values(state.devices).sort((a, b) => (b.lastSeenAt || '').localeCompare(a.lastSeenAt || '')),
-    events: state.events
-  });
+  socket.emit('state', getPublicState());
 });
 
 server.listen(PORT, () => {

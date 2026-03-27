@@ -11,8 +11,8 @@ const char* API_PATH = "/api/click";
 const char* API_KEY = "BURAYA_RENDER_API_KEY";
 const char* DEVICE_ID = "esp01-01";
 
-// ESP-01 için en güvenlisi GPIO2.
-// Buton: GPIO2 -> buton -> GND
+// ESP-01 icin güvenli tercih: GPIO2
+// Baglanti: GPIO2 -> buton -> GND
 const uint8_t BUTTON_PIN = 2;
 
 bool lastStableState = HIGH;
@@ -91,7 +91,6 @@ void loop() {
     if (reading != lastStableState) {
       lastStableState = reading;
 
-      // INPUT_PULLUP: basili = LOW
       if (lastStableState == LOW) {
         if (millis() - lastSentAt > minGapMs) {
           bool ok = sendClick();
