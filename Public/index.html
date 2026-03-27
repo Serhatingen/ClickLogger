@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ESP-01 Clicker Panel</title>
-  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <style>
     :root {
       --bg: #0b0d12;
@@ -12,8 +11,8 @@
       --line: rgba(255,255,255,.08);
       --text: #eef2ff;
       --muted: #99a2b3;
-      --accent: #63e;
-      --accent2: #41d1a0;
+      --accent: #6e61ff;
+      --ok: #41d1a0;
       --danger: #ff6b6b;
     }
     * { box-sizing: border-box; }
@@ -27,7 +26,10 @@
       width: min(1200px, calc(100% - 24px));
       margin: 24px auto 40px;
     }
-    h1 { margin: 0 0 8px; font-size: 30px; }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
     .muted { color: var(--muted); }
     .grid {
       display: grid;
@@ -42,12 +44,19 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.22);
     }
     .stat { grid-column: span 3; }
-    .wide { grid-column: span 12; }
     .half { grid-column: span 6; }
-    .num { font-size: 34px; font-weight: 800; margin-top: 8px; }
+    .num {
+      font-size: 34px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
     .dot {
-      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
-      background: var(--accent2); margin-right: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      background: var(--ok);
+      margin-right: 8px;
       box-shadow: 0 0 12px rgba(65,209,160,.75);
     }
     table {
@@ -61,22 +70,36 @@
       border-bottom: 1px solid var(--line);
       vertical-align: top;
     }
-    th { color: var(--muted); font-weight: 600; }
-    tbody tr:hover { background: rgba(255,255,255,.03); }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    tbody tr:hover {
+      background: rgba(255,255,255,.03);
+    }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       background: rgba(255,255,255,.06);
       padding: 3px 6px;
       border-radius: 8px;
+      word-break: break-all;
     }
     .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      border: 1px solid var(--line); border-radius: 999px;
-      padding: 8px 12px; color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 13px;
     }
-    .empty { color: var(--muted); padding: 10px 0 4px; }
+    .empty {
+      color: var(--muted);
+      padding: 10px 0 4px;
+    }
     @media (max-width: 900px) {
-      .stat, .half, .wide { grid-column: span 12; }
+      .stat, .half { grid-column: span 12; }
       h1 { font-size: 24px; }
       .num { font-size: 28px; }
       table { font-size: 13px; }
@@ -86,7 +109,7 @@
 <body>
   <div class="wrap">
     <h1>ESP-01 Clicker Panel</h1>
-    <div class="muted" style="margin-bottom:18px;">Her tuş basışı server zaman damgası ile kaydedilir.</div>
+    <div class="muted" style="margin-bottom:18px;">Her buton basışında server zaman damgası bırakır.</div>
 
     <div class="grid">
       <div class="card stat">
@@ -124,6 +147,7 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     const totalClicksEl = document.getElementById('totalClicks');
     const deviceCountEl = document.getElementById('deviceCount');
@@ -132,9 +156,19 @@
     const eventsWrap = document.getElementById('eventsWrap');
     const liveStatus = document.getElementById('liveStatus');
 
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
     function fmtIso(v) {
       if (!v) return '-';
       const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return String(v);
       return d.toLocaleString('tr-TR');
     }
 
@@ -206,29 +240,26 @@
       renderEvents(state.events || []);
     }
 
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
-
     fetch('/api/state')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('state fetch failed');
+        return r.json();
+      })
       .then(renderState)
       .catch(() => {
         liveStatus.innerHTML = '<span class="dot" style="background:var(--danger); box-shadow:none;"></span>ilk veri alınamadı';
       });
 
     const socket = io();
+
     socket.on('connect', () => {
       liveStatus.innerHTML = '<span class="dot"></span>bağlı';
     });
+
     socket.on('disconnect', () => {
       liveStatus.innerHTML = '<span class="dot" style="background:var(--danger); box-shadow:none;"></span>kopuk';
     });
+
     socket.on('state', renderState);
   </script>
 </body>
