@@ -13,6 +13,7 @@
       --muted: #99a2b3;
       --accent: #6e61ff;
       --ok: #41d1a0;
+      --warn: #f6c65b;
       --danger: #ff6b6b;
     }
     * { box-sizing: border-box; }
@@ -22,20 +23,10 @@
       background: linear-gradient(180deg, #0b0d12, #090b0f 50%, #0b0d12);
       color: var(--text);
     }
-    .wrap {
-      width: min(1200px, calc(100% - 24px));
-      margin: 24px auto 40px;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 30px;
-    }
+    .wrap { width: min(1280px, calc(100% - 24px)); margin: 24px auto 40px; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
     .muted { color: var(--muted); }
-    .grid {
-      display: grid;
-      gap: 16px;
-      grid-template-columns: repeat(12, 1fr);
-    }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -45,61 +36,31 @@
     }
     .stat { grid-column: span 3; }
     .half { grid-column: span 6; }
-    .num {
-      font-size: 34px;
-      font-weight: 800;
-      margin-top: 8px;
-    }
+    .full { grid-column: span 12; }
+    .num { font-size: 34px; font-weight: 800; margin-top: 8px; }
     .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      display: inline-block;
-      background: var(--ok);
-      margin-right: 8px;
-      box-shadow: 0 0 12px rgba(65,209,160,.75);
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+      background: var(--ok); margin-right: 8px; box-shadow: 0 0 12px rgba(65,209,160,.75);
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td {
-      text-align: left;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
+      text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top;
     }
-    th {
-      color: var(--muted);
-      font-weight: 600;
-    }
-    tbody tr:hover {
-      background: rgba(255,255,255,.03);
-    }
+    th { color: var(--muted); font-weight: 600; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background: rgba(255,255,255,.06);
-      padding: 3px 6px;
-      border-radius: 8px;
-      word-break: break-all;
+      background: rgba(255,255,255,.06); padding: 3px 6px; border-radius: 8px; word-break: break-all;
     }
     .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 8px 12px;
-      color: var(--muted);
-      font-size: 13px;
+      display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line);
+      border-radius: 999px; padding: 8px 12px; color: var(--muted); font-size: 13px;
     }
-    .empty {
-      color: var(--muted);
-      padding: 10px 0 4px;
-    }
+    .empty { color: var(--muted); padding: 10px 0 4px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
     @media (max-width: 900px) {
-      .stat, .half { grid-column: span 12; }
+      .stat, .half, .full { grid-column: span 12; }
       h1 { font-size: 24px; }
       .num { font-size: 28px; }
       table { font-size: 13px; }
@@ -109,7 +70,7 @@
 <body>
   <div class="wrap">
     <h1>ESP-01 Clicker Panel</h1>
-    <div class="muted" style="margin-bottom:18px;">Her buton basışında server zaman damgası bırakır.</div>
+    <div class="muted" style="margin-bottom:18px;">Click ve heartbeat olayları izlenir. İş günü kesimi server tarafında 05:00 olarak hesaplanır.</div>
 
     <div class="grid">
       <div class="card stat">
@@ -129,17 +90,25 @@
         <div class="num" id="liveStatus" style="font-size:20px; display:flex; align-items:center;"><span class="dot"></span>bağlı</div>
       </div>
 
+      <div class="card full">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap;">
+          <strong>Google Sheets durumu</strong>
+          <span class="pill">Ham veri: <code>RawEvents</code></span>
+        </div>
+        <div id="sheetsStatus" class="muted">Kontrol ediliyor...</div>
+      </div>
+
       <div class="card half">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
           <strong>Cihazlar</strong>
-          <span class="pill">Kaynak: <code>/api/click</code></span>
+          <span class="pill">Kaynak: <code>/api/click</code> + <code>/api/heartbeat</code></span>
         </div>
         <div id="devicesWrap"></div>
       </div>
 
       <div class="card half">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
-          <strong>Son tıklamalar</strong>
+          <strong>Son eventler</strong>
           <span class="pill">Canlı: Socket.IO</span>
         </div>
         <div id="eventsWrap"></div>
@@ -155,6 +124,7 @@
     const devicesWrap = document.getElementById('devicesWrap');
     const eventsWrap = document.getElementById('eventsWrap');
     const liveStatus = document.getElementById('liveStatus');
+    const sheetsStatus = document.getElementById('sheetsStatus');
 
     function escapeHtml(s) {
       return String(s)
@@ -184,7 +154,9 @@
             <tr>
               <th>Device</th>
               <th>Click</th>
-              <th>Son görülme</th>
+              <th>Heartbeat</th>
+              <th>Son click/seen</th>
+              <th>Son heartbeat</th>
               <th>RSSI</th>
             </tr>
           </thead>
@@ -192,8 +164,10 @@
             ${devices.map(d => `
               <tr>
                 <td><code>${escapeHtml(d.deviceId)}</code></td>
-                <td>${d.clickCount}</td>
+                <td>${d.clickCount ?? 0}</td>
+                <td>${d.heartbeatCount ?? 0}</td>
                 <td>${fmtIso(d.lastSeenAt)}</td>
+                <td>${fmtIso(d.lastHeartbeatAt)}</td>
                 <td>${d.lastRssi ?? '-'}</td>
               </tr>
             `).join('')}
@@ -212,6 +186,7 @@
         <table>
           <thead>
             <tr>
+              <th>Tür</th>
               <th>#</th>
               <th>Device</th>
               <th>Server timestamp</th>
@@ -221,7 +196,8 @@
           <tbody>
             ${events.map(e => `
               <tr>
-                <td>${e.seq}</td>
+                <td>${escapeHtml(e.type || 'click')}</td>
+                <td>${e.seq ?? '-'}</td>
                 <td><code>${escapeHtml(e.deviceId)}</code></td>
                 <td>${fmtIso(e.serverTimestamp)}</td>
                 <td>${e.deviceTimestamp ?? '-'}</td>
@@ -236,6 +212,9 @@
       totalClicksEl.textContent = state.totalClicks || 0;
       deviceCountEl.textContent = (state.devices || []).length;
       eventCountEl.textContent = (state.events || []).length;
+      sheetsStatus.innerHTML = state.sheetsEnabled
+        ? '<span class="ok">Google Sheets bağlı.</span> Click ve heartbeat satırları append edilir.'
+        : '<span class="warn">Google Sheets bağlı değil.</span> Env değişkenleri eksik veya hatalı.';
       renderDevices(state.devices || []);
       renderEvents(state.events || []);
     }
