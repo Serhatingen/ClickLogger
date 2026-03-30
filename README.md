@@ -1,52 +1,61 @@
-# ESP-01 Clicker
+# ESP-01 Clicker + Google Sheets
 
-ESP-01 butona her basıldığında Render üzerinde çalışan Node sunucusuna istek yollar. Sunucu da server timestamp üretip panelde canlı gösterir.
+Bu sürüm:
+- click eventlerini kabul eder
+- heartbeat eventlerini kabul eder
+- canlı web panel gösterir
+- Google Sheets içine ham veriyi append eder
+- iş günü kesimini `05:00` kabul eder
 
-## Dosyalar
+## Gerekli Render env değişkenleri
 
-- `server.js`: Express + Socket.IO backend
-- `public/index.html`: canlı panel
-- `esp01_clicker.ino`: ESP-01 Arduino kodu
-- `render.yaml`: Render deploy ayarı
-- `package.json`: Node bağımlılıkları
-
-## Render
-
-Environment Variables:
-
-- `API_KEY` = kendi gizli anahtarın
-- `MAX_EVENTS` = 300
-- `NODE_VERSION` = 22.22.0
-
-Build Command:
-
-```bash
-npm install
-```
-
-Start Command:
-
-```bash
-npm start
-```
-
-Health Check Path:
-
-```text
-/health
-```
-
-## ESP tarafında değiştir
-
-`esp01_clicker.ino` içinde şunları doldur:
-
-- `HOST`
 - `API_KEY`
-- `DEVICE_ID`
-- gerekirse `WIFI_SSID` ve `WIFI_PASS`
+- `MAX_EVENTS` (ör. `300`)
+- `GOOGLE_SHEETS_SPREADSHEET_ID`
+- `GOOGLE_SHEETS_TAB_NAME` (`RawEvents` önerilir)
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
+- `CLUB_TIMEZONE` (`Europe/Istanbul`)
+- `CLUB_DAY_CUTOFF_HOUR` (`5`)
 
-## Buton bağlantısı
+## Bu proje için mevcut bilgiler
 
-- GPIO2 -> buton -> GND
+- Spreadsheet ID: `1nIRSw8Wmm5BM2R2jJGF7QNEgU4gbMvA45ndD7o6gvXA`
+- Service account email: `clicker@spherical-jetty-491819-h6.iam.gserviceaccount.com`
 
-INPUT_PULLUP kullanıldığı için butona basılınca LOW okunur.
+## Google Sheet paylaşımı
+
+Google Sheet'i şu hesapla `Editor` olarak paylaş:
+
+`clicker@spherical-jetty-491819-h6.iam.gserviceaccount.com`
+
+Kişisel hesap sahibi (`lovedpturket@gmail.com`) sheet sahibi olarak kalabilir.
+Service account yalnızca yazma/okuma için editör olur.
+
+## RawEvents başlıkları
+
+Server ilk açılışta başlığı otomatik yazmayı dener:
+
+- server_timestamp_utc
+- event_type
+- device_id
+- seq
+- rssi
+- battery
+- ip
+- device_timestamp_ms
+- server_unix_ms
+- event_local_time
+- club_business_date
+- club_day_name
+- club_hour
+- club_hour_label
+- club_session_key
+
+## İş günü mantığı
+
+`CLUB_DAY_CUTOFF_HOUR=5` ise:
+- Cumartesi 02:10 kaydı, takvim olarak Cumartesi olsa bile
+- `club_business_date` alanında bir önceki geceye, yani Cuma oturumuna yazılır
+
+Bu alanlar yoğun ve seyrek saat analizini kolaylaştırır.
